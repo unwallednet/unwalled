@@ -1,0 +1,24 @@
+[package]
+name = "unwalled-node"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+
+# Node-specific dependencies
+rocksdb = "0.21.0"
+libp2p = { version = "0.53", features = ["tokio", "gossipsub", "mdns", "noise", "tcp", "yamux"] }
+quiche = "0.20.0"
+log = "0.4"
+env_logger = "0.11"
+anyhow = "1.0"
+ring = "0.17"
+hotstuff_rs = "0.4.0"
+rcgen = "0.12"
+ed25519-dalek = { version = "2.1.0", features = ["serde"] }
+rand = "0.8"
+hex = "0.4"

@@ -1,0 +1,17 @@
+[package]
+name = "unwalled-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+
+anyhow = "1.0"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+log = "0.4"
+
+# This dependency is on the node itself, to share the primitive types
+unwalled-node = { path = "../node" }

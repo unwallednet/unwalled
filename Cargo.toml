@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "node",
+    "client",
+]
+
+[workspace.dependencies]
+# Central place for common dependencies
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.8", features = ["v4", "serde"] }
+

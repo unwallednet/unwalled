@@ -1,0 +1,117 @@
+@startuml C4 Architecture Diagrams for Unwalled Node
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+' STYLE DEFINITIONS
+' =================================
+skinparam defaultTextAlignment center
+
+' LEVEL 1: SYSTEM CONTEXT
+' =================================
+
+TITLE System Context Diagram for Unwalled Ad Exchange
+
+Person(advertiser, "Advertiser", "A business that wants to place ads.")
+Person(publisher, "Publisher", "A website/app owner that wants to display ads.")
+
+System(unwalled_node, "Unwalled Ad Exchange", "The decentralized, L1 ad exchange network.")
+
+System_Ext(did_system, "Crypto Wallet System", "e.g., Keeta Client, MetaMask. Provides wallets for signing transactions.")
+System_Ext(settlement_layer, "Settlement Layer (Keeta)", "The L1 blockchain for identity and final fund settlement.")
+
+Rel(advertiser, unwalled_node, "Places bids and pays transaction tolls")
+Rel(publisher, unwalled_node, "Triggers auctions and receives revenue")
+
+Rel_Back(advertiser, did_system, "Signs transactions using")
+Rel_Back(publisher, did_system, "Signs transactions using")
+
+Rel(unwalled_node, did_system, "Verifies transaction signatures")
+Rel(unwalled_node, settlement_layer, "Onboards/offboards funds and anchors identities")
+
+' LEVEL 2: CONTAINER DIAGRAM
+' =================================
+
+System_Boundary(c1, "Unwalled Ad Exchange") {
+    Container(node, "Unwalled Node", "Rust, libp2p, RocksDB", "A single validator node in the BFT network. Many nodes form the network.")
+    ContainerDb(db, "State Database", "RocksDB", "Embedded key-value store for the order book, account balances, and state.")
+    Container(rpc, "RPC Interface", "Rust, QUIC (HTTP/3)", "Exposes an API for clients to submit signed transactions.")
+
+    Rel(node, db, "Reads from and writes to", "State & Column Families")
+    Rel(rpc, node, "Forwards transactions to", "Internal Channels")
+}
+
+Rel(advertiser, rpc, "Submits signed Bid transactions via", "HTTP/3 API")
+Rel(publisher, rpc, "Submits signed AuctionTrigger transactions via", "HTTP/3 API")
+
+Rel_Neighbor(node, node, "Communicates with other nodes via", "Gossipsub & HotStuff BFT")
+
+' LEVEL 3: COMPONENT DIAGRAM (for the Unwalled Node)
+' =================================
+
+Container_Boundary(c2, "Unwalled Node") {
+    Component(main, "Main Event Loop", "main.rs", "Initializes and orchestrates all other components.")
+    Component(network, "Network Manager", "network.rs", "Manages P2P connections (mDNS) and transaction gossiping (Gossipsub).")
+    Component(consensus, "Consensus Engine", "consensus.rs", "Wraps HotStuff-rs. Receives transactions and agrees on a final order.")
+    Component(state, "State Manager", "state.rs", "Manages state transitions. Applies committed blocks to RocksDB (bids, accounts).", "Fee & State Logic")
+    Component(rpc_server, "RPC Server", "rpc.rs", "Handles incoming HTTP/3 connections and forwards valid transactions to consensus.")
+    Component(identity, "Identity Abstraction", "identity.rs", "Provides traits and structures for cryptographic signing and verification.")
+    Component(settlement, "Settlement Manager", "settlement.rs", "Interacts with the L1 Settlement Layer (Keeta) for funds.")
+
+    Rel(main, network, "Starts")
+    Rel(main, rpc_server, "Starts")
+    Rel(main, consensus, "Initializes")
+    Rel(main, settlement, "Initializes")
+
+    Rel(rpc_server, main, "Sends transactions via channel")
+    Rel(network, main, "Sends transactions via channel")
+    
+    Rel(main, consensus, "Submits transactions for ordering")
+    Rel(consensus, state, "Delivers committed blocks to")
+    
+    Rel(state, identity, "Uses to verify signatures")
+    Rel(state, settlement, "Uses to manage funds")
+}
+
+' LEVEL 4: CODE/CLASS DIAGRAM (Simplified)
+' =================================
+
+package "primitives" {
+    class "Signed<T>" as Signed {
+        + data: T
+        + signer: PublicKey
+        + signature: Signature
+        + nonce: u64
+        + fee: u64
+    }
+    class Bid
+    class AuctionTrigger
+    Signed *-- Bid
+    Signed *-- AuctionTrigger
+}
+
+package "state" {
+    class StateManager {
+        - db: RocksDB
+        + get_balance(address): u64
+        + set_balance(address, amount)
+        + apply_fees(address, fee)
+        + place_bid(bid)
+    }
+    note right of StateManager
+        Manages Column Families:
+        - "accounts"
+        - "bids"
+    end note
+}
+
+package "consensus" {
+    class ConsensusApp {
+        - state_manager: StateManager
+        + deliver(transaction)
+    }
+    Rel(ConsensusApp, state.StateManager, "Updates state by calling")
+}
+
+@enduml
